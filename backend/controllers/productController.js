@@ -1,6 +1,6 @@
 import asyncHandler from '../middleware/asyncHandler.js';
 import Product from '../models/productModel.js';
-
+import cloudinary from "./../config/upload.js";
 // @desc    Fetch all products
 // @route   GET /api/products
 // @access  Public
@@ -10,11 +10,11 @@ const getProducts = asyncHandler(async (req, res) => {
 
   const keyword = req.query.keyword
     ? {
-        name: {
-          $regex: req.query.keyword,
-          $options: 'i',
-        },
-      }
+      name: {
+        $regex: req.query.keyword,
+        $options: 'i',
+      },
+    }
     : {};
 
   const count = await Product.countDocuments({ ...keyword });
@@ -40,28 +40,58 @@ const getProductById = asyncHandler(async (req, res) => {
 // @desc    Create a product
 // @route   POST /api/products
 // @access  Private/Admin
-const createProduct = asyncHandler(async (req, res) => {
-  const product = new Product({
-    name: 'Sample name',
-    price: 0,
-    user: req.user._id,
-    image: '/images/sample.jpg',
-    brand: 'Sample brand',
-    category: 'Sample category',
-    countInStock: 0,
-    numReviews: 0,
-    description: 'Sample description',
-  });
+// const createProduct = asyncHandler(async (req, res) => {
+//   const product = new Product({
+//     name: 'Sample name',
+//     price: 0,
+//     user: req.user._id,
+//     image: '/images/sample.jpg',
+//     brand: 'Sample brand',
+//     category: 'Sample category',
+//     countInStock: 0,
+//     numReviews: 0,
+//     description: 'Sample description',
+//   });
 
-  const createdProduct = await product.save();
-  res.status(201).json(createdProduct);
+//   const createdProduct = await product.save();
+//   res.status(201).json(createdProduct);
+// });
+const createProduct = asyncHandler(async (req, res) => {
+  const result = await cloudinary.uploader.upload(req.body.image, {
+    folder: "uploads",
+    transformation: { width: 296, height: 236, crop: "limit", quality: "auto", },
+  });
+  try {
+    const product = new Product({
+      name: req.body.name,
+      price: req.body.price,
+      user: req.user._id,
+      image: result.secure_url,
+      brand: req.body.brand,
+      category: req.body.category,
+      countInStock: req.body.countInStock,
+      description: req.body.description,
+    });
+
+
+
+    const createdProduct = await product.save();
+    res.status(201).json(createdProduct);
+  } catch (error) {
+    // Handle any errors
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
 });
 
 // @desc    Update a product
 // @route   PUT /api/products/:id
 // @access  Private/Admin
 const updateProduct = asyncHandler(async (req, res) => {
-  const { name, price, description, image, brand, category, countInStock } =
+  const result = await cloudinary.uploader.upload(req.body.image, {
+    folder: "uploads",
+    transformation: { width: 296, height: 236, crop: "limit", quality: "auto", },
+  });
+  const { name, price, description, brand, category, countInStock } =
     req.body;
 
   const product = await Product.findById(req.params.id);
@@ -70,7 +100,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     product.name = name;
     product.price = price;
     product.description = description;
-    product.image = image;
+    product.image = result.secure_url;
     product.brand = brand;
     product.category = category;
     product.countInStock = countInStock;
