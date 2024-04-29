@@ -17,7 +17,11 @@ const authUser = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       isAdmin: user.isAdmin,
-      token: token
+      token: token,
+      referralCode: user.referralCode,
+      referredBy: user.referredBy,
+      points: user.points
+
     });
   } else {
     res.status(401);
@@ -28,8 +32,64 @@ const authUser = asyncHandler(async (req, res) => {
 // @desc    Register a new user
 // @route   POST /api/users
 // @access  Public
+// const registerUser = asyncHandler(async (req, res) => {
+//   const { name, email, password, referralCode } = req.body;
+
+//   const userExists = await User.findOne({ email });
+
+//   if (userExists) {
+//     res.status(400);
+//     throw new Error('User already exists');
+//   }
+
+
+//   let referredBy = null;
+//   let pointsEarned = 0;
+
+//   if (referralCode) {
+//     referredBy = await User.findOne({ referralCode });
+//     if (!referredBy) {
+//       res.status(400);
+//       throw new Error('Invalid referral code');
+//     }
+//     // Give 10 points to the referrer
+//     referredBy.points += 10;
+//     await referredBy.save();
+//     pointsEarned = 5;
+//   }
+
+//   const user = await User.create({
+//     name,
+//     email,
+//     password,
+//     referredBy,
+//     points: pointsEarned,
+//     referralCode: Math.random().toString(36).substring(7)
+
+//   });
+
+//   if (user) {
+//     generateToken(res, user._id);
+
+//     res.status(201).json({
+//       _id: user._id,
+//       name: user.name,
+//       email: user.email,
+//       isAdmin: user.isAdmin,
+//       referralCode: user.referralCode,
+//       referredBy: user.referredBy,
+//       points: user.points
+
+//     });
+//   } else {
+//     res.status(400);
+//     throw new Error('Invalid user data');
+//   }
+// });
+
+
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, referralCode } = req.body;
 
   const userExists = await User.findOne({ email });
 
@@ -38,10 +98,25 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('User already exists');
   }
 
+  let referredBy = null;
+
+  if (referralCode) {
+    referredBy = await User.findOne({ referralCode });
+    if (!referredBy) {
+      res.status(400);
+      throw new Error('Invalid referral code');
+    }
+    referredBy.points += 200; // Give 200 points to the user whose referral code is used
+    await referredBy.save();
+  }
+
   const user = await User.create({
     name,
     email,
     password,
+    referredBy,
+    points: 0, // New signup user doesn't earn points in this scenario
+    referralCode: Math.random().toString(36).substring(7)
   });
 
   if (user) {
@@ -52,12 +127,16 @@ const registerUser = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       isAdmin: user.isAdmin,
+      referralCode: user.referralCode,
+      referredBy: user.referredBy,
+      points: user.points
     });
   } else {
     res.status(400);
     throw new Error('Invalid user data');
   }
 });
+
 
 // @desc    Logout user / clear cookie
 // @route   POST /api/users/logout
@@ -82,6 +161,9 @@ const getUserProfile = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       isAdmin: user.isAdmin,
+      referralCode: user.referralCode,
+      referredBy: user.referredBy,
+      points: user.points
     });
   } else {
     res.status(404);
@@ -93,23 +175,28 @@ const getUserProfile = asyncHandler(async (req, res) => {
 // @route   PUT /api/users/profile
 // @access  Private
 const updateUserProfile = asyncHandler(async (req, res) => {
+  console.log("🚀 ~ updateUserProfile ~ req:", req.body)
   const user = await User.findById(req.user._id);
 
   if (user) {
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
+    user.points = req.body.points || user.points;
 
     if (req.body.password) {
       user.password = req.body.password;
     }
 
     const updatedUser = await user.save();
+    console.log("🚀 ~ updateUserProfile ~ user:", user)
+    console.log("🚀 ~ updateUserProfile ~ updatedUser:", updatedUser)
 
     res.json({
       _id: updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
       isAdmin: updatedUser.isAdmin,
+      points: updatedUser.points
     });
   } else {
     res.status(404);
